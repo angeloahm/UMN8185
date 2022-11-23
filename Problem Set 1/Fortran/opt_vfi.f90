@@ -6,8 +6,9 @@ program  opt_vfi
     !Define useful variables
     real :: norm, lower, upper
     
-    integer :: i_k, i_k_prime, iter, fake_iter       !Indexes and iteration stuff
-    integer :: ind_policy, ind_temp
+    integer :: j, i_k, i_k_prime, iter, fake_iter       !Indexes and iteration stuff
+    integer :: ind_temp
+    integer :: i_capital=1.0
 
     !Model parameters
     real, parameter :: A=1.0            !Productivity term
@@ -58,8 +59,14 @@ program  opt_vfi
 
         do i_k = 1, n_k !i_k
             k = k_grid(i_k)
+            
+            if ( i_k==1 ) then
+                j=i_k
+            else
+                j=i_capital
+            end if
 
-            do i_k_prime = 1, n_k !i_k_prime
+            do i_k_prime = j, n_k !i_k_prime
                 
                 k_prime = k_grid(i_k_prime)
                 !Flow utility
@@ -70,20 +77,24 @@ program  opt_vfi
 
                 V_temp(i_k_prime) = log(c) + beta*V0(i_k_prime)
 
-                
+                if ( i_k_prime<n_k ) then
+                    if ( V_temp(i_k_prime)>V_temp(i_k_prime+1) ) then
+                        i_capital = i_k_prime
+                        thevalue = V_temp(i_k_prime)
+                    end if
+                else
+                    ind_temp = maxloc(V_temp)
+                    i_capital = ind_temp
+                    thevalue = V_temp(i_capital)
+                end if
+
             end do !i_k_prime
-
-            !Pick optimal policy
-            ind_temp = maxloc(V_temp)
-            ind_policy = ind_temp
-            thevalue = V_temp(ind_policy)
-
+            
             !Update policy & VF
             valuefunction(i_k) = thevalue
-            k_policy(i_k) = k_grid(ind_policy)
-            c_policy(i_k) = A*k**alpha + (1-delta)*k -  k_policy(i_k)
-            policy_index(i_k) = ind_policy
-
+            policy_index(i_k) = i_capital
+            k_policy(i_k) = k_grid(i_capital)
+            c_policy(i_k) = A*k**(alpha) + (1-delta)*k - k_grid(i_capital)
             
         end do !i_k
 
@@ -116,7 +127,7 @@ program  opt_vfi
     end do
     
     !Restart initial guess 
-    V_old = valuefunction
+    V_old = valuefunction + ((upper + lower)/2)
 
     !Write files
     open(11,file='k_ss.txt',status='replace')
